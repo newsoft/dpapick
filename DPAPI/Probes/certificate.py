@@ -209,6 +209,15 @@ class PrivateKeyBlob(probe.DPAPIProbe):
             return True
         return False
 
+    def try_decrypt_with_password(self, password, mkp, sid, **k):
+        if self.flags != None:
+            if self.flags.try_decrypt_with_password(password, mkp, sid, **k):
+                self.privateKey.entropy = self.flags.cleartext
+                return self.privateKey.try_decrypt_with_password(password, mkp, sid, **k)
+        else:
+            return True
+        return False
+
     def export(self):
         """This functions encodes the RSA key pair in PEM format. Simply calls the same function on the key blob."""
         return self.privateKey.export()
