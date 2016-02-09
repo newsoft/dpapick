@@ -1,0 +1,41 @@
+# coding: utf-8
+from DPAPI.Core import *
+from DPAPI.Probes import certificate
+import os
+import argparse
+
+def process_privkey(privkey_file, password, mkp, sid):
+  with open(privkey_file, 'rb') as pkey:
+    try:
+      blob = certificate.PrivateKeyBlob(pkey.read())
+      if blob.try_decrypt_with_password(password, mkp, sid):
+          with open("%s.asc" % privkey_file, "w") as output:
+            output.write(blob.export())
+          print "[-] Decrypted key saved to: %s.asc" % privkey_file
+    except Exception as e:
+      print "[!] Error decrypting private key %s: %s" % (privkey_file, str(e))
+
+
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--sid', dest='sid', metavar='STRING', required=True)
+  parser.add_argument('--password', dest='password', metavar='STRING', required=True)
+  parser.add_argument('--masterkeydir', dest='mkeys', metavar='PATH', required=True)
+  parser.add_argument('--credhist', dest='credhist', metavar='FILE', default=None)
+  parser.add_argument('privkeys', nargs='+')
+
+  args = parser.parse_args()
+  mkp = masterkey.MasterKeyPool()
+  if args.credhist:
+    mkp.addCredhistFile(args.sid, args.credhist)
+  mkp.loadDirectory(args.mkeys)
+  mkp.try_credential(args.sid, args.password)
+
+  for privkey_item in args.privkeys:
+    if os.path.isdir(privkey_item):
+      for privkey_file in os.listdir(privkey_item):
+        process_privkey(os.path.join(privkey_item, privkey_file), args.password, mkp, args.sid)
+    elif os.path.isfile(privkey_item):
+      process_privkey(privkey_item, args.password, mkp, args.sid)
+    else:
+      print '[i] Skipped item: ', privkey_item
