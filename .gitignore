@@ -1,2 +1,4 @@
 build/*
+dist/*
+dpapick.egg-info/*
 *.pyc
