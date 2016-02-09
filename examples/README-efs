@@ -1,0 +1,16 @@
+DECRYPTING EFS PRIVATE KEY
+
+Source platform: Windows 7 SP1 x86
+
+python efs \
+  --sid "S-1-5-21-3027084306-2734134368-2794325442-1008" \
+  --password "test" \
+  --masterkeydir "../tests-EFS/Users/test/AppData/Roaming/Microsoft/Protect/S-1-5-21-3027084306-2734134368-2794325442-1008/" \
+  --credhist "../tests-EFS/Users/test/AppData/Roaming/Microsoft/Protect/CREDHIST" \
+  ../tests-EFS/Users/test/AppData/Roaming/Microsoft/Crypto/RSA/*
+
+NOTE: this is currently broken. You can compare the extracted private key (1) with the expected private key (2).
+
+(1) tests-EFS/Users/test/AppData/Roaming/Microsoft/Crypto/RSA/S-1-5-21-3027084306-2734134368-2794325442-1008/b3e970dbf387bad1e8c7c2ce59391ef2_7a253518-1530-4398-8c87-41a892d6ff4e.asc
+
+(2) tests-EFS/Users/test/AppData/Roaming/Microsoft/Crypto/RSA/S-1-5-21-3027084306-2734134368-2794325442-1008/expected.asc
