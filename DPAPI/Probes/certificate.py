@@ -96,7 +96,7 @@ class PrivateKeyBlob(probe.DPAPIProbe):
             self.coefficient = data.eat("%is" % (len1 / 2))[:chunk]
             self.privExponent = data.eat("%is" % len1)[:2 * chunk]
             self.asn1 = self.RSAKeyASN1()
-            ll = lambda x: long(x.encode('hex'), 16)
+            ll = lambda x: long(x[::-1].encode('hex'), 16)
             self.asn1.setComponentByName('version', 0)
             self.asn1.setComponentByName('modulus', ll(self.modulus))
             self.asn1.setComponentByName('pubexpo', self.pubexp)
@@ -175,18 +175,35 @@ class PrivateKeyBlob(probe.DPAPIProbe):
         self.version = data.eat("L")
         data.eat("L")  # NULL
         self.descrLen = data.eat("L")
-        data.eat("2L")  # NULL NULL
+        sigheadlen, sigprivkeylen = data.eat("2L")
         headerlen = data.eat("L")
         privkeylen = data.eat("L")
         self.crcLen = data.eat("L")
-        data.eat("L")  # NULL
+        sigflagslen = data.eat("L")
         flagslen = data.eat("L")
 
-        self.description = data.eat("%is" % self.descrLen)
+        self.description = data.eat("%ds" % self.descrLen)
+        self.crc = data.eat("%ds" % self.crcLen)
 
+        # Signature key comes first
+        self.sigHeader = None
+        if sigheadlen > 0:
+            self.sigHeader = self.RSAHeader()
+            self.sigHeader.parse(data.eat_sub(sigheadlen))
+
+        self.sigPrivateKey = None
+        if sigprivkeylen > 0:
+            self.sigPrivateKey = self.RSAPrivKey()
+            self.sigPrivateKey.parse(data.eat_sub(sigprivkeylen))
+
+        self.sigFlags = None
+        if sigflagslen > 0:
+            self.sigFlags = self.RSAFlags()
+            self.sigFlags.parse(data.eat_sub(sigflagslen))
+
+        # Then export key
         self.header = None
         if headerlen > 0:
-            data.eat("5L")  # 20 NULL-bytes ...
             self.header = self.RSAHeader()
             self.header.parse(data.eat_sub(headerlen))
 
@@ -201,26 +218,30 @@ class PrivateKeyBlob(probe.DPAPIProbe):
             self.flags.parse(data.eat_sub(flagslen))
 
     def try_decrypt_with_hash(self, h, mkp, sid, **k):
-        if self.flags != None:
-            if self.flags.try_decrypt_with_hash(h, mkp, sid, **k):
-                self.privateKey.entropy = self.flags.cleartext
-                return self.privateKey.try_decrypt_with_hash(h, mkp, sid, **k)
-        else:
-            return True
+        if not self.flags:
+            return False
+        if not self.privateKey:
+            return False
+        if self.flags.try_decrypt_with_hash(h, mkp, sid, **k):
+            self.privateKey.entropy = self.flags.cleartext
+            return self.privateKey.try_decrypt_with_hash(h, mkp, sid, **k)
         return False
 
     def try_decrypt_with_password(self, password, mkp, sid, **k):
-        if self.flags != None:
-            if self.flags.try_decrypt_with_password(password, mkp, sid, **k):
-                self.privateKey.entropy = self.flags.cleartext
-                return self.privateKey.try_decrypt_with_password(password, mkp, sid, **k)
-        else:
-            return True
+        if not self.flags:
+            return False
+        if not self.privateKey:
+            return False
+        if self.flags.try_decrypt_with_password(password, mkp, sid, **k):
+            self.privateKey.entropy = self.flags.cleartext
+            return self.privateKey.try_decrypt_with_password(password, mkp, sid, **k)
         return False
 
     def export(self):
         """This functions encodes the RSA key pair in PEM format. Simply calls the same function on the key blob."""
-        return self.privateKey.export()
+        if self.privateKey:
+            return self.privateKey.export()
+        return ''
 
     def __repr__(self):
         s = ["Microsoft Certificate"]
